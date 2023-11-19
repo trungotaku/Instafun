@@ -5,9 +5,22 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using DragonBones;
 using UnityEngine.Rendering;
+using Unity.Linq;
+using Transform = UnityEngine.Transform;
 
 public class CharacterItem : BaseItem, IDragHandler, IEndDragHandler, IBeginDragHandler
 {
+    [SerializeField] Transform a;
+    [SerializeField] Transform b;
+    [SerializeField] Transform c;
+    [SerializeField] Transform d;
+
+    public Vector2 A => a.position;
+    public Vector2 B => b.position;
+    public Vector2 C => c.position;
+    public Vector2 D => d.position;
+
+    [SerializeField] ClothingPanel clothingPanel;
     [SerializeField] UnityEngine.Transform footRoot;
     [SerializeField] UnityEngine.Transform sofaRoot;
     [SerializeField] UnityArmatureComponent armatureComponent;
@@ -19,7 +32,27 @@ public class CharacterItem : BaseItem, IDragHandler, IEndDragHandler, IBeginDrag
 
     Vector3 m_deltaPos = Vector3.zero;
 
+    CharacterSkin m_currentCharacterSkin = CharacterSkin.Pink;
+
     private CharacterState m_state = CharacterState.Stand;
+
+    [SerializeField] List<GameObject> _skinSlots;
+    Dictionary<string, GameObject> _skinSlotDict = new Dictionary<string, GameObject>();
+
+    private void Awake()
+    {
+        _skinSlots.ForEach(x => _skinSlotDict.Add(x.name, x));
+        ChangeSkin(CharacterSkin.Pink);
+    }
+
+    private void OnEnable()
+    {
+        Messenger.AddListener<BaseItem>(GameEvent.ON_END_DRAG_ITEM, OnEndDragItem);
+    }
+    private void OnDisable()
+    {
+        Messenger.RemoveListener<BaseItem>(GameEvent.ON_END_DRAG_ITEM, OnEndDragItem);
+    }
 
     private void Start()
     {
@@ -70,7 +103,7 @@ public class CharacterItem : BaseItem, IDragHandler, IEndDragHandler, IBeginDrag
 
         sortingGroup.sortingLayerName = SortingLayerConfig.ITEM;
         armatureComponent.animation.Play("stand");
-        Messenger.Broadcast(GameEvent.ON_END_DRAG_ITEM, (BaseItem) this);
+        Messenger.Broadcast(GameEvent.ON_END_DRAG_ITEM, (BaseItem)this);
     }
 
     float m_hiTimer = 0f;
@@ -85,6 +118,57 @@ public class CharacterItem : BaseItem, IDragHandler, IEndDragHandler, IBeginDrag
             armatureComponent.animation.Play("Hi", 1);
             // Reset the timer
             m_hiTimer = 0f;
+        }
+    }
+
+    public void ChangeSkin(CharacterSkin skin_)
+    {
+        Debug.Log("ChangeSkin: " + skin_);
+        m_currentCharacterSkin = skin_;
+        _skinSlots.ForEach(x =>
+        {
+            foreach (UnityEngine.Transform child in x.transform)
+            {
+                child.gameObject.SetActive(false);
+            }
+        });
+
+        List<Sprite> spriteList = new List<Sprite>(Resources.LoadAll<Sprite>("UI/2/wearing/" + (int)skin_));
+        spriteList.ForEach(_ =>
+        {
+            SpriteRenderer spriteRenderer = _skinSlotDict[_.name].GetComponentInChildren<SpriteRenderer>();
+            if (spriteRenderer == null)
+            {
+                GameObject go = Instantiate(new GameObject(), _skinSlotDict[_.name].transform);
+                go.transform.localPosition = Vector3.zero;
+                spriteRenderer = go.AddComponent<SpriteRenderer>();
+            }
+            else
+            {
+                spriteRenderer.gameObject.SetActive(true);
+            }
+            spriteRenderer.sprite = _;
+        });
+    }
+
+    void OnEndDragItem(BaseItem item_)
+    {
+
+        if (item_ is ClothingItem)
+        {
+            ClothingItem clothingItem = (ClothingItem)item_;
+            if (UtilityExtension.IsPointInsideQuadrilateral(clothingItem.Center, new Vector2[] { A, B, C, D }))
+            {
+                Debug.Log("Inside");
+                clothingItem.ClothingSlot.gameObject.SetActive(false);
+                clothingPanel.EnableSlotByCharacterSkin(m_currentCharacterSkin);
+                ChangeSkin(clothingItem.CharacterSkin);
+            }
+            else
+            {
+                Debug.Log("Outside");
+                clothingItem.gameObject.LeanMoveLocal(Vector3.zero, 0.125f).setEaseOutQuad();
+            }
         }
     }
 }

@@ -4,31 +4,23 @@ using UnityEngine;
 
 public abstract class BaseView : MonoBehaviour
 {
-    public abstract ViewId Id { get; }
+    public string Id => GetType().Name;
     public virtual bool IsFullScreen => false;
     [HideInInspector] public BaseView PreviousView;
     [HideInInspector] public BaseView NextView;
-
     [HideInInspector] public CanvasGroup canvasGroup;
 
-    protected float m_walkOutDelta;
-
-    public void SetWalkOutDelta(float del_)
-    {
-        m_walkOutDelta = del_;
-    }
     public virtual void Initialize(Dictionary<string, object> params_ = null)
     {
         canvasGroup = GetComponent<CanvasGroup>();
-        m_walkOutDelta = 1f;
     }
-    public void Hide()
+    public void DoTaskBeforeHide()
     {
         ViewManager.RemoveViewFromStack();
         PreviousView = null;
         NextView = null;
 
-        List<BaseView> views = ViewManager.GetViewStack();
+        List<BaseView> views = ViewManager.ViewStack;
         for (int i = views.Count - 1; i >= 0; i--)
         {
             if (views[i] != null)
@@ -53,14 +45,14 @@ public abstract class BaseView : MonoBehaviour
             ViewManager.DisableAllPreviousViewInStack();
         }
     }
-    public void Show(Dictionary<string, object> params_)
+    public void DoTaskBeforeShow(Dictionary<string, object> params_, bool hasInitialize_ = true)
     {
         ViewManager.AddViewToStack(this);
         NextView = null;
         gameObject.SetActive(true);
         transform.SetAsLastSibling();
 
-        Initialize(params_);
+        if (hasInitialize_) Initialize(params_);
     }
     public virtual void WalkIn()
     {
@@ -84,7 +76,6 @@ public abstract class BaseView : MonoBehaviour
     }
     public virtual void Lock(bool isTrue_)
     {
-        // canvasGroup.interactable = !isTrue_;
         canvasGroup.blocksRaycasts = !isTrue_;
 
         if (isTrue_)

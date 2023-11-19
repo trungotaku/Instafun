@@ -7,6 +7,6 @@ public class MainGameManager : SceneSingleton<MainGameManager>
     public GameController GameController;
     void Start()
     {
-        ViewManager.Show(ViewId.GameView);
+        ViewManager.Show<GameView>();
     }
 }

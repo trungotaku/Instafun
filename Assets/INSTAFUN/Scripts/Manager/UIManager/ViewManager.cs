@@ -2,93 +2,93 @@
 using System.Collections.Generic;
 using UnityEngine;
 using System;
-using Unity.Linq;
 using System.Linq;
 
 public class ViewManager : SceneSingleton<ViewManager>
 {
-    private const string PREFABS_BASE_PATH = "ViewPrefabs/";
-    [SerializeField] GameObject m_lockGO;
-    public BaseView CurrentView
-    {
-        get { return viewStack.Count > 0 ? viewStack.Last() : null; }
-    }
-    public BaseView PreviousView
-    {
-        get { return viewStack.Count > 1 ? viewStack.Last().PreviousView : null; }
-    }
-    private Dictionary<ViewId, string> m_viewsDictionary;
-    private Dictionary<ViewId, BaseView> m_instantiatedViews;
+    #region INITIALIZATION
+    const string PREFABS_BASE_PATH = "ViewPrefabs/";
+    [SerializeField] GameObject m_blockGO;
+    Dictionary<string, BaseView> m_instantiatedViews;
     [Header("INITIALIZATION")]
-    [SerializeField] private List<BaseView> EarlyInitializationViews;
+    [SerializeField] List<BaseView> EarlyInitializationViews;
     [Header("STACK (ONLY SEE, DONT EDIT PLEASE!!)")]
-    [SerializeField] private List<BaseView> viewStack;
-
-    public static List<BaseView> GetViewStack()
-    {
-        return Instance.viewStack;
-    }
+    [SerializeField] List<BaseView> m_viewStack;
 
     void Awake()
     {
-        InitializeUI();
+        _InitializeUI();
     }
-
-    void InitializeUI()
+    void _InitializeUI()
     {
-        m_instantiatedViews = new Dictionary<ViewId, BaseView>();
-        m_viewsDictionary = new Dictionary<ViewId, string>();
-
-        foreach (ViewId id in (ViewId[]) Enum.GetValues(typeof(ViewId)))
+        m_instantiatedViews = new Dictionary<string, BaseView>();
+        m_viewStack = new List<BaseView>();
+        EarlyInitializationViews.ForEach(view =>
         {
-            m_viewsDictionary.Add(id, id.ToString());
-        }
+            m_instantiatedViews.Add(view.GetType().Name, view);
+        });
+    }
+    #endregion INITIALIZATION
 
-        viewStack = new List<BaseView>();
-
-        EarlyInitializationViews.ForEach(view => m_instantiatedViews.Add(view.Id, view));
-    }
-    public static void Show(ViewId viewID_, Dictionary<string, object> params_, Action onCompleted_ = null)
+    #region PRIVATE METHODS
+    BaseView _Show(string viewId_, Dictionary<string, object> params_ = null, Action onCompleted_ = null)
     {
-        Instance._Show(viewID_, params_, onCompleted_);
-    }
-    public static void Show(ViewId viewID_, Action onCompleted_ = null)
-    {
-        Instance._Show(viewID_, null, onCompleted_);
-    }
-    void _Show(ViewId viewID_, Dictionary<string, object> params_ = null, Action onCompleted_ = null)
-    {
-        BaseView view = GetView(viewID_);
+        BaseView view = _GetView(viewId_);
         if (view == null)
         {
-            Debug.LogError("View prefab not found " + viewID_.ToString());
-            return;
+            Debug.LogError("View prefab not found " + viewId_.ToString());
+            return null;
         }
-
-        LockViewRootInHierarchy(true);
+        _LockViewRootInHierarchy(true);
         BaseView currentView = CurrentView;
         if (currentView != null)
         {
-            if (viewID_ != currentView.Id)
+            if (viewId_ != currentView.Id)
             {
                 currentView.Lock(true);
             }
             else
             {
-                Debug.LogWarning("Warning!!! This view is existed in STACK: " + viewID_.ToString());
+                Debug.LogWarning("Warning!!! This view is existed in STACK: " + viewId_.ToString());
                 _RemoveViewFromStack();
-                view.Show(params_);
-                StartCoroutine(ExecuteWalkIn(view));
-                return;
+                view.DoTaskBeforeShow(params_);
+                StartCoroutine(_ExecuteWalkIn(view));
+                return view;
             }
         }
-
-        view.Show(params_);
-        StartCoroutine(ExecuteWalkIn(view, onCompleted_));
+        view.DoTaskBeforeShow(params_);
+        StartCoroutine(_ExecuteWalkIn(view, onCompleted_));
+        return view;
     }
-    public static void Hide(Action onCompleted_ = null)
+    T _Show<T>(Dictionary<string, object> params_ = null, Action onCompleted_ = null) where T : BaseView
     {
-        Instance._Hide(Instance.CurrentView, onCompleted_);
+        string viewId = typeof(T).Name;
+        BaseView view = _GetView(viewId);
+        if (view == null)
+        {
+            Debug.LogError("View prefab not found " + viewId.ToString());
+            return null;
+        }
+        _LockViewRootInHierarchy(true);
+        BaseView currentView = CurrentView;
+        if (currentView != null)
+        {
+            if (viewId != currentView.GetType().Name)
+            {
+                currentView.Lock(true);
+            }
+            else
+            {
+                Debug.LogWarning("Warning!!! This view is existed in STACK: " + viewId.ToString());
+                _RemoveViewFromStack();
+                view.DoTaskBeforeShow(params_);
+                StartCoroutine(_ExecuteWalkIn(view));
+                return view as T;
+            }
+        }
+        view.DoTaskBeforeShow(params_);
+        StartCoroutine(_ExecuteWalkIn(view, onCompleted_));
+        return view as T;
     }
     void _Hide(BaseView view_, Action onCompleted_)
     {
@@ -97,41 +97,71 @@ public class ViewManager : SceneSingleton<ViewManager>
             Debug.LogError("[ViewManager] Error!!! This view is null");
             return;
         };
-
         BaseView currentView = CurrentView;
-        if (view_.Id != currentView.Id)
+        if (view_.GetType().Name != currentView.GetType().Name)
         {
-            Debug.LogError("[ViewManager] Can't hide, this view is not the last view in STACK!!!");
+            Debug.LogError("[ViewManager] Error!!! This view is not the last view in STACK!!!");
             return;
         }
-        view_.Hide();
+        view_.DoTaskBeforeHide();
         if (view_.gameObject.activeSelf)
         {
-            StartCoroutine(ExecuteWalkOut(view_, onCompleted_));
+            StartCoroutine(_ExecuteWalkOut(view_, onCompleted_));
         }
         else
         {
             onCompleted_?.Invoke();
         }
     }
-    BaseView GetView(ViewId index_)
+    void _QuickHide(BaseView view_)
+    {
+        if (view_ == null)
+        {
+            Debug.LogError("[ViewManager] Error!!! This view is null");
+            return;
+        };
+        BaseView currentView = CurrentView;
+        if (view_.GetType().Name != currentView.GetType().Name)
+        {
+            Debug.LogError("[ViewManager] Error!!! This view is not the last view in STACK!!!");
+            return;
+        }
+        view_.DoTaskBeforeHide();
+        if (view_.gameObject.activeSelf)
+        {
+            if (view_ != null)
+            {
+                if (m_viewStack.Count > 0)
+                {
+                    _LockViewRootInHierarchy(false);
+                    CurrentView.Lock(false);
+                }
+                view_.DoWhenHideIsCompleted();
+            }
+        }
+    }
+    BaseView _GetView(string viewId_)
     {
         if (m_instantiatedViews == null) return null;
 
-        if (m_instantiatedViews.ContainsKey(index_))
+        if (m_instantiatedViews.ContainsKey(viewId_))
         {
-            return m_instantiatedViews[index_];
+            return m_instantiatedViews[viewId_];
         }
         else
         {
-            BaseView bview = Instantiate(Resources.Load<BaseView>(PREFABS_BASE_PATH + m_viewsDictionary[index_]), transform, false) as BaseView;
-            bview.name = m_viewsDictionary[index_];
-            m_instantiatedViews.Add(index_, bview);
+            BaseView bview = Instantiate(Resources.Load<BaseView>(PREFABS_BASE_PATH + viewId_), transform, false) as BaseView;
+            bview.name = viewId_;
+            m_instantiatedViews.Add(viewId_, bview);
 
-            return m_instantiatedViews[index_];
+            return m_instantiatedViews[viewId_];
         }
     }
-    IEnumerator ExecuteWalkIn(BaseView view_, Action onCompleted_ = null)
+    void _LockViewRootInHierarchy(bool isTrue_)
+    {
+        m_blockGO.SetActive(isTrue_);
+    }
+    IEnumerator _ExecuteWalkIn(BaseView view_, Action onCompleted_ = null)
     {
         if (view_ != null)
         {
@@ -150,7 +180,7 @@ public class ViewManager : SceneSingleton<ViewManager>
         }
         yield break;
     }
-    IEnumerator ExecuteWalkOut(BaseView view_, Action onCompleted_ = null)
+    IEnumerator _ExecuteWalkOut(BaseView view_, Action onCompleted_ = null)
     {
         if (view_ != null)
         {
@@ -159,9 +189,9 @@ public class ViewManager : SceneSingleton<ViewManager>
 
             yield return new WaitForSecondsRealtime(waitTime);
 
-            if (viewStack.Count > 0)
+            if (m_viewStack.Count > 0)
             {
-                LockViewRootInHierarchy(false);
+                _LockViewRootInHierarchy(false);
                 CurrentView.Lock(false);
             }
             view_.DoWhenHideIsCompleted();
@@ -169,52 +199,58 @@ public class ViewManager : SceneSingleton<ViewManager>
         }
         yield break;
     }
-    public static void LockViewRootInHierarchy(bool isTrue_)
+    void _AddViewToStack(BaseView view_)
     {
-        Instance._Lock(isTrue_);
-    }
-    void _Lock(bool isTrue_)
-    {
-        m_lockGO.SetActive(isTrue_);
-    }
-    public static void AddViewToStack(BaseView view_)
-    {
-        Instance._AddViewToStack(view_);
-    }
-    private void _AddViewToStack(BaseView view_)
-    {
-        viewStack.Add(view_);
-        if (viewStack.Count > 1)
+        m_viewStack.Add(view_);
+        if (m_viewStack.Count > 1)
         {
-            viewStack.Last().PreviousView = viewStack[viewStack.Count - 2];
-            viewStack[viewStack.Count - 2].NextView = view_;
+            m_viewStack.Last().PreviousView = m_viewStack[m_viewStack.Count - 2];
+            m_viewStack[m_viewStack.Count - 2].NextView = view_;
         }
     }
-    public static void RemoveViewFromStack()
+    void _RemoveViewFromStack()
     {
-        Instance._RemoveViewFromStack();
-    }
-    private void _RemoveViewFromStack()
-    {
-        if (viewStack.Count > 0)
+        if (m_viewStack.Count > 0)
         {
-            viewStack.RemoveAt(viewStack.Count - 1);
-            if (viewStack.Count > 0) viewStack.LastOrDefault().NextView = null;
+            m_viewStack.RemoveAt(m_viewStack.Count - 1);
+            if (m_viewStack.Count > 0) m_viewStack.LastOrDefault().NextView = null;
         }
     }
-
     void _DisableAllPreviousViewInStack()
     {
-        if (viewStack.Count > 0)
+        if (m_viewStack.Count > 0)
         {
-            for (int i = 0; i < viewStack.Count - 1; i++)
+            for (int i = 0; i < m_viewStack.Count - 1; i++)
             {
-                viewStack[i].gameObject.SetActive(false);
+                m_viewStack[i].gameObject.SetActive(false);
             }
         }
     }
-    public static void DisableAllPreviousViewInStack()
+    BaseView _GetCurrentView()
     {
-        Instance._DisableAllPreviousViewInStack();
+        return m_viewStack.Count > 0 ? m_viewStack.Last() : null;
     }
+    BaseView _GetPreviousView()
+    {
+        return m_viewStack.Count > 1 ? m_viewStack[m_viewStack.Count - 2] : null;
+    }
+    #endregion PRIVATE METHODS
+
+    #region OBSOLETE METHODS
+    public static List<BaseView> ViewStack { get { return Instance.m_viewStack; } }
+    public static BaseView PreviousView { get { return Instance._GetPreviousView(); } }
+    public static void LockViewRootInHierarchy(bool isTrue_) { Instance._LockViewRootInHierarchy(isTrue_); }
+    public static void AddViewToStack(BaseView view_) { Instance._AddViewToStack(view_); }
+    public static void RemoveViewFromStack() { Instance._RemoveViewFromStack(); }
+    public static void DisableAllPreviousViewInStack() { Instance._DisableAllPreviousViewInStack(); }
+    #endregion OBSOLETE METHODS
+
+    #region PUBLIC METHODS
+    public static BaseView CurrentView { get { return Instance._GetCurrentView(); } }
+    public static BaseView Show(string viewId_, Dictionary<string, object> params_ = null, Action onCompleted_ = null) { return Instance._Show(viewId_, params_, onCompleted_); }
+    public static T Show<T>(Dictionary<string, object> params_, Action onCompleted_ = null) where T : BaseView { return Instance._Show<T>(params_, onCompleted_); }
+    public static T Show<T>(Action onCompleted_ = null) where T : BaseView { return Instance._Show<T>(null, onCompleted_); }
+    public static void Hide(Action onCompleted_ = null) { Instance._Hide(CurrentView, onCompleted_); }
+    public static void QuickHide() { Instance._QuickHide(CurrentView); }
+    #endregion PUBLIC METHODS
 }

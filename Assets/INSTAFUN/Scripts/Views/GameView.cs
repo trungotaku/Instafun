@@ -4,7 +4,6 @@ using UnityEngine;
 
 public class GameView : BaseView
 {
-    public override ViewId Id => ViewId.GameView;
     [SerializeField] Transform behindFloorLimitPos;
     [SerializeField] Transform frontFloorLimitPos;
 
