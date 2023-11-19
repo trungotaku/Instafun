@@ -103,6 +103,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   sortingGroup: {fileID: 502454236492398558}
   center: {fileID: 218329399752446672}
+  m_handRoot: {fileID: 218329399752446672}
 --- !u!222 &825686969509291712
 CanvasRenderer:
   m_ObjectHideFlags: 0

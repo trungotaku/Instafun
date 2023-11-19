@@ -21,7 +21,7 @@ public class GameController : MonoBehaviour
         float deltaY = item_.transform.position.y - item_.CenterY;
         if (item_ is CharacterItem)
         {
-            CharacterItem characterItem = (CharacterItem) item_;
+            CharacterItem characterItem = (CharacterItem)item_;
             if (characterItem.FootPosY > m_view.FloorLimitPosMaxY)
             {
                 LeanTween.moveY(item_.gameObject, m_view.FloorLimitPosMaxY + deltaY, 0.5f).setEaseOutBounce()
@@ -45,7 +45,7 @@ public class GameController : MonoBehaviour
         }
         else if (item_ is CakeItem)
         {
-            CakeItem cakeItem = (CakeItem) item_;
+            CakeItem cakeItem = (CakeItem)item_;
             if (cakeItem.CenterY > m_view.FloorLimitPosMaxY)
             {
                 LeanTween.moveY(item_.gameObject, m_view.FloorLimitPosMaxY + deltaY, 0.5f).setEaseOutBounce()
@@ -66,10 +66,14 @@ public class GameController : MonoBehaviour
             {
                 RefreshSortingOrder();
             }
+
+            cakeItem.transform.parent = cakeItem.ParentAtInit;
+            cakeItem.transform.rotation = Quaternion.identity;
         }
         else if (item_ is CushionItem)
         {
-            CushionItem cushionItem = (CushionItem) item_;
+
+            CushionItem cushionItem = (CushionItem)item_;
             if (cushionItem.CenterY > m_view.FloorLimitPosMaxY)
             {
                 LeanTween.moveY(item_.gameObject, m_view.FloorLimitPosMaxY + deltaY, 0.5f).setEaseOutBounce()
@@ -79,6 +83,33 @@ public class GameController : MonoBehaviour
                     });
             }
             else if (cushionItem.CenterY < m_view.FloorLimitPosMinY)
+            {
+                LeanTween.moveY(item_.gameObject, m_view.FloorLimitPosMinY + deltaY, 0.25f).setEaseOutQuad()
+                    .setOnComplete(() =>
+                    {
+                        RefreshSortingOrder();
+                    });
+            }
+            else
+            {
+                RefreshSortingOrder();
+            }
+
+            cushionItem.transform.parent = cushionItem.ParentAtInit;
+            cushionItem.transform.rotation = Quaternion.identity;
+        }
+        else if (item_ is ClothingFoldedItem)
+        {
+            ClothingFoldedItem foldItem = (ClothingFoldedItem)item_;
+            if (foldItem.CenterY > m_view.FloorLimitPosMaxY)
+            {
+                LeanTween.moveY(item_.gameObject, m_view.FloorLimitPosMaxY + deltaY, 0.5f).setEaseOutBounce()
+                    .setOnComplete(() =>
+                    {
+                        RefreshSortingOrder();
+                    });
+            }
+            else if (foldItem.CenterY < m_view.FloorLimitPosMinY)
             {
                 LeanTween.moveY(item_.gameObject, m_view.FloorLimitPosMinY + deltaY, 0.25f).setEaseOutQuad()
                     .setOnComplete(() =>

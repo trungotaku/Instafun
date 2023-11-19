@@ -10,15 +10,9 @@ using Transform = UnityEngine.Transform;
 
 public class CharacterItem : BaseItem, IDragHandler, IEndDragHandler, IBeginDragHandler
 {
-    [SerializeField] Transform a;
-    [SerializeField] Transform b;
-    [SerializeField] Transform c;
-    [SerializeField] Transform d;
-
-    public Vector2 A => a.position;
-    public Vector2 B => b.position;
-    public Vector2 C => c.position;
-    public Vector2 D => d.position;
+    [SerializeField] AreaRoot m_boxRoot;
+    [SerializeField] AreaRoot m_handLeftRoot;
+    [SerializeField] AreaRoot m_handRightRoot;
 
     [SerializeField] ClothingPanel clothingPanel;
     [SerializeField] UnityEngine.Transform footRoot;
@@ -112,12 +106,9 @@ public class CharacterItem : BaseItem, IDragHandler, IEndDragHandler, IBeginDrag
         // Update the timer
         m_hiTimer += Time.deltaTime;
         // Check if it's time to play the animation
-        if (m_state.Equals(CharacterState.Stand) && m_hiTimer >= 10f)
+        if (m_hiTimer >= 10f)
         {
-            // Play the "Hi" animation
-            armatureComponent.animation.Play("Hi", 1);
-            // Reset the timer
-            m_hiTimer = 0f;
+            _PlayHiAnimation();
         }
     }
 
@@ -140,6 +131,7 @@ public class CharacterItem : BaseItem, IDragHandler, IEndDragHandler, IBeginDrag
             if (spriteRenderer == null)
             {
                 GameObject go = Instantiate(new GameObject(), _skinSlotDict[_.name].transform);
+                go.transform.parent = _skinSlotDict[_.name].transform;
                 go.transform.localPosition = Vector3.zero;
                 spriteRenderer = go.AddComponent<SpriteRenderer>();
             }
@@ -157,18 +149,140 @@ public class CharacterItem : BaseItem, IDragHandler, IEndDragHandler, IBeginDrag
         if (item_ is ClothingItem)
         {
             ClothingItem clothingItem = (ClothingItem)item_;
-            if (UtilityExtension.IsPointInsideQuadrilateral(clothingItem.Center, new Vector2[] { A, B, C, D }))
+            if (UtilityExtension.IsPointInsideQuadrilateral(clothingItem.Center, new Vector2[] { m_boxRoot.A, m_boxRoot.B, m_boxRoot.C, m_boxRoot.D }))
             {
                 Debug.Log("Inside");
-                clothingItem.ClothingSlot.gameObject.SetActive(false);
-                clothingPanel.EnableSlotByCharacterSkin(m_currentCharacterSkin);
+                clothingItem.ClothingSlot.PutOnCharacter();
+                clothingPanel.GetSlotByCharacterSkin(m_currentCharacterSkin).Fold(transform.position, footRoot.position.y - 0.25f);
                 ChangeSkin(clothingItem.CharacterSkin);
+
+                _PlayHiAnimation();
             }
             else
             {
                 Debug.Log("Outside");
                 clothingItem.gameObject.LeanMoveLocal(Vector3.zero, 0.125f).setEaseOutQuad();
             }
+        }
+        else if (item_ is ClothingFoldedItem)
+        {
+            ClothingFoldedItem foldItem = (ClothingFoldedItem)item_;
+            if (UtilityExtension.IsPointInsideQuadrilateral(foldItem.Center, new Vector2[] { m_boxRoot.A, m_boxRoot.B, m_boxRoot.C, m_boxRoot.D }))
+            {
+                Debug.Log("Inside");
+                foldItem.ClothingSlot.PutOnCharacter();
+                clothingPanel.GetSlotByCharacterSkin(m_currentCharacterSkin).Fold(transform.position, footRoot.position.y - 0.25f);
+                ChangeSkin(foldItem.CharacterSkin);
+
+                _PlayHiAnimation();
+            }
+            else
+            {
+                Debug.Log("Outside");
+            }
+        }
+        else if (item_ is CushionItem)
+        {
+            CushionItem cushionItem = (CushionItem)item_;
+            if (m_handLeftRoot.GetComponentInChildren<BaseItem>() == null
+            && UtilityExtension.IsPointInsideQuadrilateral(cushionItem.HandPos, new Vector2[] { m_handLeftRoot.A, m_handLeftRoot.B, m_handLeftRoot.C, m_handLeftRoot.D }))
+            {
+                Debug.Log("LeftHand CharacterItem");
+                _AttachItem(m_handLeftRoot.transform, cushionItem.transform);
+
+                switch (m_state)
+                {
+                    case CharacterState.Stand:
+                    case CharacterState.Hi:
+                        armatureComponent.animation.Play("handl_hold");
+                        break;
+                    case CharacterState.Sit:
+                        armatureComponent.animation.Play("sit_handl_hold");
+                        break;
+                }
+            }
+            else if (m_handRightRoot.GetComponentInChildren<BaseItem>() == null
+            && UtilityExtension.IsPointInsideQuadrilateral(cushionItem.HandPos, new Vector2[] { m_handRightRoot.A, m_handRightRoot.B, m_handRightRoot.C, m_handRightRoot.D }))
+            {
+                Debug.Log("RightHand CharacterItem");
+                _AttachItem(m_handRightRoot.transform, cushionItem.transform);
+
+                switch (m_state)
+                {
+                    case CharacterState.Stand:
+                    case CharacterState.Hi:
+                        armatureComponent.animation.Play("handr_hold");
+                        break;
+                    case CharacterState.Sit:
+                        armatureComponent.animation.Play("sit_handr_hold");
+                        break;
+                }
+            }
+            else
+            {
+                Debug.Log("Outside CharacterItem");
+                // _AttachItem(cushionItem.ParentAtInit, cushionItem.transform);
+            }
+        }
+        else if (item_ is CakeItem)
+        {
+            CakeItem cakeItem = (CakeItem)item_;
+            if (m_handLeftRoot.GetComponentInChildren<BaseItem>() == null
+            && UtilityExtension.IsPointInsideQuadrilateral(cakeItem.HandPos, new Vector2[] { m_handLeftRoot.A, m_handLeftRoot.B, m_handLeftRoot.C, m_handLeftRoot.D }))
+            {
+                Debug.Log("LeftHand CharacterItem");
+                _AttachItem(m_handLeftRoot.transform, cakeItem.transform);
+
+                switch (m_state)
+                {
+                    case CharacterState.Stand:
+                    case CharacterState.Hi:
+                        armatureComponent.animation.Play("handl_hold");
+                        break;
+                    case CharacterState.Sit:
+                        armatureComponent.animation.Play("sit_handl_hold");
+                        break;
+                }
+            }
+            else if (m_handRightRoot.GetComponentInChildren<BaseItem>() == null &&
+            UtilityExtension.IsPointInsideQuadrilateral(cakeItem.HandPos, new Vector2[] { m_handRightRoot.A, m_handRightRoot.B, m_handRightRoot.C, m_handRightRoot.D }))
+            {
+                Debug.Log("RightHand CharacterItem");
+                _AttachItem(m_handRightRoot.transform, cakeItem.transform);
+
+                switch (m_state)
+                {
+                    case CharacterState.Stand:
+                    case CharacterState.Hi:
+                        armatureComponent.animation.Play("handr_hold");
+                        break;
+                    case CharacterState.Sit:
+                        armatureComponent.animation.Play("sit_handr_hold");
+                        break;
+                }
+            }
+            else
+            {
+                Debug.Log("Outside CharacterItem");
+                // _AttachItem(cushionItem.ParentAtInit, cushionItem.transform);
+            }
+        }
+    }
+    void _AttachItem(Transform parent_, Transform itemTrans_)
+    {
+        itemTrans_.parent = parent_;
+        itemTrans_.localPosition = Vector3.zero;
+        // itemTrans_.localRotation = Quaternion.identity;
+        // itemTrans_.localScale = Vector3.one;
+    }
+    void _PlayHiAnimation()
+    {
+        if (m_state.Equals(CharacterState.Stand))
+        {
+            // Play the "Hi" animation
+            armatureComponent.animation.Play("Hi", 1);
+            // Reset the timer
+            m_hiTimer = 0f;
         }
     }
 }

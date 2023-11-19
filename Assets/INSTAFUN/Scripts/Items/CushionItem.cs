@@ -8,6 +8,10 @@ public class CushionItem : BaseItem, IDragHandler, IEndDragHandler, IBeginDragHa
 {
     private bool m_isDrag = false;
     Vector3 m_deltaPos = Vector3.zero;
+
+    [SerializeField] Transform m_handRoot;
+    public Vector2 HandPos => m_handRoot.position;
+
     public void OnBeginDrag(PointerEventData eventData)
     {
         m_isDrag = true;
@@ -33,6 +37,6 @@ public class CushionItem : BaseItem, IDragHandler, IEndDragHandler, IBeginDragHa
         m_isDrag = false;
 
         sortingGroup.sortingLayerName = SortingLayerConfig.ITEM;
-        Messenger.Broadcast(GameEvent.ON_END_DRAG_ITEM, (BaseItem) this);
+        Messenger.Broadcast(GameEvent.ON_END_DRAG_ITEM, (BaseItem)this);
     }
 }

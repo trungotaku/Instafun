@@ -11,12 +11,16 @@ public class ClothingPanel : MonoBehaviour
 
     public void Awake()
     {
-        m_slots.ForEach(x => m_slotDict.Add(x.ClothingItem.CharacterSkin, x));
+        m_slots.ForEach(x =>
+        {
+            m_slotDict.Add(x.ClothingItem.CharacterSkin, x);
+            x.Hang();
+        });
+        m_slots[0].PutOnCharacter();
     }
 
-    public void EnableSlotByCharacterSkin(CharacterSkin characterSkin)
+    public ClothingSlot GetSlotByCharacterSkin(CharacterSkin characterSkin)
     {
-        m_slotDict[characterSkin].gameObject.SetActive(true);
-        m_slotDict[characterSkin].ClothingItem.Init();
+        return m_slotDict[characterSkin];
     }
 }

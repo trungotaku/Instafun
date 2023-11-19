@@ -4,13 +4,20 @@ using Constants;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
-public class CakeItem : BaseItem, IDragHandler, IEndDragHandler, IBeginDragHandler
+public class ClothingFoldedItem : BaseItem, IDragHandler, IEndDragHandler, IBeginDragHandler
 {
     private bool m_isDrag = false;
     Vector3 m_deltaPos = Vector3.zero;
+    [SerializeField] ClothingSlot m_clothingSlot;
+    [SerializeField] CharacterSkin _characterSkin;
+    public CharacterSkin CharacterSkin => _characterSkin;
+    public ClothingSlot ClothingSlot => m_clothingSlot;
 
-    [SerializeField] Transform m_handRoot;
-    public Vector2 HandPos => m_handRoot.position;
+    public override void Init()
+    {
+        base.Init();
+        transform.localPosition = Vector3.zero;
+    }
 
     public void OnBeginDrag(PointerEventData eventData)
     {
@@ -31,7 +38,6 @@ public class CakeItem : BaseItem, IDragHandler, IEndDragHandler, IBeginDragHandl
 
         Vector3 pos = Vector3.right * mousePos.x + Vector3.up * mousePos.y + m_deltaPos;
         this.transform.position = new Vector3(pos.x, pos.y, 0);
-        // this.transform.localPosition = new Vector3(this.transform.localPosition.x, this.transform.localPosition.y, 0);
     }
     public void OnEndDrag(PointerEventData eventData)
     {
